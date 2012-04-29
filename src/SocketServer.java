@@ -28,7 +28,7 @@ public class SocketServer extends java.lang.Thread {
         Socket socket;
         BufferedInputStream in;
         BufferedOutputStream out;
-        String UserId,ShopId;
+        String UserId,ShopId,Pwd;
         String info;
         int numPoints=0;
         System.out.println("server starts!");
@@ -72,6 +72,18 @@ public class SocketServer extends java.lang.Thread {
                 	out = null;
                 	System.out.println("REC finished");
                 }
+                else if(data.startsWith("VERIFY")){
+                	String[] part = data.split(" ");
+                	ShopId=part[1];
+                	Pwd=part[2];
+                	
+                	String result = verify(ShopId,Pwd);
+                	out.write(("VERIFYRESULT "+result).getBytes());
+                	out.flush();
+                	out.close();
+                	out = null;
+                	System.out.println("VERIFY finished");
+                }
                 /*
                 Socket client = new Socket();              
                 InetSocketAddress isa = new InetSocketAddress(socket.getInetAddress(), 7788);
@@ -97,7 +109,34 @@ public class SocketServer extends java.lang.Thread {
         }
     }
  
-    public static void main(String args[]) {
+    private String verify(String shopId, String pwd) {
+    		Connection con = null;
+    		try {
+    	      Class.forName("sun.jdbc.odbc.JdbcOdbcDriver") ;
+    	      con = DriverManager.getConnection("jdbc:odbc:mianher2");
+    	      System.out.println("DSN Connection ok.");
+    	      String TableName;
+    	      Statement stmt = con.createStatement();
+    	      ResultSet rs = stmt.executeQuery("SELECT TableName FROM ShopAccount where ShopId='"+shopId+"' AND Pwd='"+pwd+"'");
+    	      rs.next();
+    	      TableName = rs.getString("TableName");
+    	      con.close();
+    	      if(TableName!=null){
+    	    	  System.out.println(TableName);
+    	    	  return TableName;
+    	      }
+    	      else
+    	    	  return "ERROR";
+    		  
+
+    	    } catch (Exception e) {
+    	      System.err.println("Exception: "+e.getMessage());
+    	      return "ERROR";
+    	    }
+    	    
+	}
+
+	public static void main(String args[]) {
         (new SocketServer()).start();
     }
     public static void newshop(String ShopName, String ShopId, String Pwd){
