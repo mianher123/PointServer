@@ -1,12 +1,14 @@
 import java.io.BufferedInputStream;
 import java.sql.*;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.io.BufferedOutputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
- 
+
+
 public class SocketServer extends java.lang.Thread {
  
     private boolean OutServer = false;
@@ -95,15 +97,17 @@ public class SocketServer extends java.lang.Thread {
                 	System.out.println("VERIFY finished");
                 }
                 else if(data.startsWith("FBLIST")){
-                	String[] part = data.split(" ");
-                	String s="";
+                	
+                	/*String[] part = data.split(" ");
+                	
                 	for(int i=1;i<part.length;i++){
                 		if (checkUserList(part[i]).equals("true")){
                 			s +=(part[i]+" ");
                 			
                 		}
                 		
-                	}
+                	}*/
+                	String s = checkUserList(data);
                 	out.write(("FBLISTRESULT "+s).getBytes());
                 	out.flush();
                 	out.close();
@@ -190,6 +194,7 @@ public class SocketServer extends java.lang.Thread {
 	private String exchange(String myId, String yourId, String ShopName, String NumPoints) {
     	Connection con = null;
     	  try {
+    		  
     	      Class.forName("sun.jdbc.odbc.JdbcOdbcDriver") ;
     	      con = DriverManager.getConnection("jdbc:odbc:mianher2");
     	      System.out.println("DSN Connection ok.");
@@ -201,6 +206,7 @@ public class SocketServer extends java.lang.Thread {
     	    	  con.close();
     	    	  return "false";
     	      } 
+    	      
     	      System.out.println("8");
     	      int myPoints = rs.getInt("Points");
     	      System.out.println("7");
@@ -247,29 +253,42 @@ public class SocketServer extends java.lang.Thread {
     	  
 	}
 
-	private String checkUserList(String userId) {
+	private String checkUserList(String data) {
+		String[] part = data.split(" ");
+		ArrayList<String> DBIDs = new ArrayList<String>();
+		String s = "";
+		
+    	
     	Connection con = null;
 		try {
 	      Class.forName("sun.jdbc.odbc.JdbcOdbcDriver") ;
 	      con = DriverManager.getConnection("jdbc:odbc:mianher2");
 	      System.out.println("DSN Connection ok.");
 	      Statement stmt = con.createStatement();
-	      ResultSet rs = stmt.executeQuery("SELECT UserId FROM UserList where UserId='"+userId+"'");
+	      //ResultSet rs = stmt.executeQuery("SELECT UserId FROM UserList where UserId='"+userId+"'");
+	      ResultSet rs = stmt.executeQuery("SELECT UserId FROM UserList");
+	      while (rs.next()){
+	    	  String id = rs.getString("UserId").replaceAll(" ", "");
+	    	  System.out.println(id);
+	    	  DBIDs.add(id);
+	    	  
+	      }
+	      for(int i=1;i<part.length;i++){
+	    		if (DBIDs.contains(part[i])){
+	    			s +=(part[i]+" ");
+	    			System.out.println(part[i]);
+	    		}
+	    		
+	    	}
+	      con.close();
+	      return s;
 	      
-	      if (rs.next()){
-	    	  System.out.println(rs.getString("UserId"));
-	    	  con.close();
-	    	  return "true";
-	      }
-	      else{
-	    	  con.close();
-	    	  return "false";
-	      }
 
 	    } catch (Exception e) {
 	      System.err.println("Exception: "+e.getMessage());
 	      return "ERROR";
 	    }
+		
 	}
 
 	private void register(String userId){
@@ -373,10 +392,21 @@ public class SocketServer extends java.lang.Thread {
   	      System.out.println(TableName);
   	      
   	      rs = stmt.executeQuery("SELECT Points FROM "+TableName+" where UserId='"+UserId+"'");
-  	      if(!rs.next())
-  	    	  num=Integer.parseInt(numPoints);
-  	      else
-  	    	  num=rs.getInt("Points")+Integer.parseInt(numPoints);
+  	      
+  	      if(!rs.next()){
+  	    	  if(Integer.parseInt(numPoints) >= 0)
+  	    		  num=Integer.parseInt(numPoints);
+  	    	  else
+  	    		  return "failed";
+  	      }
+  	      else{
+  	    	int myPoints = rs.getInt("Points");
+  	    	if(myPoints+Integer.parseInt(numPoints) < 0 )
+    	    	  return "failed";
+  	    	else
+    	    	  num=myPoints+Integer.parseInt(numPoints);  
+  	      } 
+  	      
   	      
   	      try{stmt.executeUpdate("INSERT INTO "+TableName +  " VALUES ("+UserId+", "+num+")"); }
   	      catch(Exception e){
