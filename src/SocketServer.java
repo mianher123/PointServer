@@ -84,6 +84,52 @@ public class SocketServer extends java.lang.Thread {
                 	out = null;
                 	System.out.println("VERIFY finished");
                 }
+                else if(data.startsWith("REGISTER")){
+                	String[] part = data.split(" ");
+                	UserId=part[1];
+                	
+                	register(UserId);
+                	
+                	out.close();
+                	out = null;
+                	System.out.println("VERIFY finished");
+                }
+                else if(data.startsWith("FBLIST")){
+                	String[] part = data.split(" ");
+                	String s="";
+                	for(int i=1;i<part.length;i++){
+                		if (checkUserList(part[i]).equals("true")){
+                			s +=(part[i]+" ");
+                			
+                		}
+                		
+                	}
+                	out.write(("FBLISTRESULT "+s).getBytes());
+                	out.flush();
+                	out.close();
+                	out = null;
+                	System.out.println("FBLIST finished");
+                }
+                else if(data.startsWith("EXCHANGE")){
+                	String[] part = data.split(" ");
+                	String result = exchange(part[1],part[2],part[3],part[4]);
+                	out.write(("EXCHANGERESULT "+result).getBytes());
+                	out.flush();
+                	out.close();
+                	out = null;
+                	System.out.println("EXCHANGE finished");
+                }
+                else if(data.startsWith("REFRESH")){
+                	String[] part = data.split(" ");
+                	System.out.println("ID = "+part[1]);
+                	String result = refresh(part[1]);
+                	
+                	out.write(("REFRESHRESULT "+result).getBytes());
+                	out.flush();
+                	out.close();
+                	out = null;
+                	System.out.println("REFRESH finished");
+                }
                 /*
                 Socket client = new Socket();              
                 InetSocketAddress isa = new InetSocketAddress(socket.getInetAddress(), 7788);
@@ -108,7 +154,139 @@ public class SocketServer extends java.lang.Thread {
  
         }
     }
- 
+    private String refresh(String userId) {
+    	Connection con = null;
+    	  String output="";
+    	    try {
+    	      Class.forName("sun.jdbc.odbc.JdbcOdbcDriver") ;
+    	      con = DriverManager.getConnection("jdbc:odbc:mianher2");
+    	      System.out.println("DSN Connection ok.");
+    	      
+    	      Statement stmt = con.createStatement();
+    	      Statement stmt2 = con.createStatement();
+    	      ResultSet rs = stmt.executeQuery("SELECT TableName FROM ShopAccount");
+    	      while(rs.next()){
+    	    	  String TableName = rs.getString("TableName");
+    	    	  ResultSet rs1 = stmt2.executeQuery("SELECT Points FROM "+TableName+" where UserId='"+userId+"'");
+    	    	  int num;
+    	    	  if(!rs1.next()){
+    	    		  num = 0;
+    	    	  }
+    	    	  else num = rs1.getInt("Points");
+    	    	  
+    	    	  output+=(TableName.replaceAll(" ", "")+" "+num+" ");
+    	    	  
+    	      }
+    	      System.out.println("output = "+output);
+    		  con.close();
+
+    	    } catch (Exception e) {
+    	      System.err.println("Exception: "+e.getMessage());
+    	    }
+    	    
+    	    return output;
+	}
+
+	private String exchange(String myId, String yourId, String ShopName, String NumPoints) {
+    	Connection con = null;
+    	  try {
+    	      Class.forName("sun.jdbc.odbc.JdbcOdbcDriver") ;
+    	      con = DriverManager.getConnection("jdbc:odbc:mianher2");
+    	      System.out.println("DSN Connection ok.");
+    	      Statement stmt = con.createStatement();
+    	      ResultSet rs = stmt.executeQuery("SELECT Points FROM "+ShopName+" where UserId='"+myId+"'");
+    	      System.out.println("0");
+    	      if(!rs.next()){
+    	    	  System.out.println("9");
+    	    	  con.close();
+    	    	  return "false";
+    	      } 
+    	      System.out.println("8");
+    	      int myPoints = rs.getInt("Points");
+    	      System.out.println("7");
+    	      System.out.println("myPoints = "+myPoints);
+    	      int numPoints = Integer.parseInt(NumPoints);
+    	      int flag=0;
+    	      //System.out.println(TableName);
+    	      if(myPoints < Integer.parseInt(NumPoints)){
+    	    	  con.close();
+    	    	  return "false";
+    	      }
+    	      
+    	      
+    	      else{
+    	    	  rs = stmt.executeQuery("SELECT Points FROM "+ShopName+" where UserId='"+yourId+"'");
+    	    	  int yourPoints=0;
+    	    	  if(rs.next()){
+    	    		  System.out.println("1");
+            	      yourPoints = rs.getInt("Points"); 
+            	      flag = 1;
+        	      }
+        	      
+    	    	  stmt.executeUpdate("UPDATE "+ShopName+" SET Points='"+(myPoints-numPoints)+"' WHERE UserId = '"+myId+"'");
+    	    	  System.out.println("2");
+    	    	  if(flag == 1)
+    	    		  stmt.executeUpdate("UPDATE "+ShopName+" SET Points='"+(yourPoints+numPoints)+"' WHERE UserId = '"+yourId+"'");
+    	    	  else
+    	    		  stmt.executeUpdate("INSERT INTO "+ShopName +  " VALUES ("+yourId+", "+(yourPoints+numPoints)+")"); 
+    	    	  System.out.println("3");
+    	    	  System.out.println("INSERT INTO ExchangeList VALUES ('"+ShopName+"', "+myId+", "+yourId+", "+NumPoints+", '"+now()+"')");
+    	    	  stmt.executeUpdate("INSERT INTO ExchangeList VALUES ('"+ShopName+"', "+myId+", "+yourId+", "+NumPoints+", '"+now()+"')");
+    	    	  System.out.println("4");
+    	    	  con.close();
+    	    	  return "true";
+    	      }
+    	      
+    		  
+
+    	    } catch (Exception e) {
+    	    	System.err.println("Exception: "+e.getMessage());
+    	      	return "false";
+    	    }
+    	    
+    	  
+	}
+
+	private String checkUserList(String userId) {
+    	Connection con = null;
+		try {
+	      Class.forName("sun.jdbc.odbc.JdbcOdbcDriver") ;
+	      con = DriverManager.getConnection("jdbc:odbc:mianher2");
+	      System.out.println("DSN Connection ok.");
+	      Statement stmt = con.createStatement();
+	      ResultSet rs = stmt.executeQuery("SELECT UserId FROM UserList where UserId='"+userId+"'");
+	      
+	      if (rs.next()){
+	    	  System.out.println(rs.getString("UserId"));
+	    	  con.close();
+	    	  return "true";
+	      }
+	      else{
+	    	  con.close();
+	    	  return "false";
+	      }
+
+	    } catch (Exception e) {
+	      System.err.println("Exception: "+e.getMessage());
+	      return "ERROR";
+	    }
+	}
+
+	private void register(String userId){
+    	  Connection con = null;
+    	    try {
+    	      Class.forName("sun.jdbc.odbc.JdbcOdbcDriver") ;
+    	      con = DriverManager.getConnection("jdbc:odbc:mianher2");
+    	      System.out.println("DSN Connection ok.");
+    	      Statement stmt = con.createStatement();
+    	      stmt.executeUpdate("INSERT INTO UserList VALUES ("+userId+", '"+now()+"')"); 
+    		  con.close();
+
+    	    } catch (Exception e) {
+    	      System.err.println("Exception: "+e.getMessage());
+    	    }
+    	  
+      }
     private String verify(String shopId, String pwd) {
     		Connection con = null;
     		try {
@@ -137,8 +315,30 @@ public class SocketServer extends java.lang.Thread {
 	}
 
 	public static void main(String args[]) {
+		//newTable("ExchangeList");
+		//newshop("FAMILY", "0005", "1234");
+		
         (new SocketServer()).start();
     }
+	
+	public static void newTable(String TableName){
+	  	  Connection con = null;
+	  	    try {
+	  	      Class.forName("sun.jdbc.odbc.JdbcOdbcDriver") ;
+	  	      con = DriverManager.getConnection("jdbc:odbc:mianher2");
+	  	      System.out.println("DSN Connection ok.");
+	  	      Statement stmt = con.createStatement();
+	  	      //stmt.execute("CREATE TABLE "+ShopName+"(UserId CHAR(25) NOT NULL, Points CHAR(25), primary key(UserId))");
+	  	      stmt.execute("CREATE TABLE "+TableName+"(ShopName CHAR(25) NOT NULL, SId CHAR(25) NOT NULL, RId CHAR(25) NOT NULL, Points CHAR(25), Timing CHAR(25), primary key(Timing))");
+	  	      //stmt.executeUpdate("INSERT INTO ShopAccount VALUES("+ShopId+","+Pwd+",'"+ShopName+"')"); 
+	  	      //stmt.execute("CREATE TABLE ShareHistory (HistoryId INTEGER NOT NULL, SenderId CHAR(25) NOT NULL, ReceiverId CHAR(25) NOT NULL, primary key(HistoryId))");
+	  		  con.close();
+
+	  	    } catch (Exception e) {
+	  	      System.err.println("Exception: "+e.getMessage());
+	  	    }
+	  	  
+	}
     public static void newshop(String ShopName, String ShopId, String Pwd){
   	  Connection con = null;
   	    try {
